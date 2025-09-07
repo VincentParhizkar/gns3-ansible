@@ -1,0 +1,48 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Upgrade all packages
+      apt:
+        upgrade: dist
+        force_apt_get: yes
+
+    - name: Install dependencies
+      apt:
+        name:
+          - software-properties-common
+          - qemu-kvm
+          - qemu-utils
+          - libvirt-daemon-system
+          - libvirt-clients
+          - bridge-utils
+          - dynamips
+          - vpcs
+        state: present
+
+    - name: Add GNS3 PPA
+      apt_repository:
+        repo: ppa:gns3/ppa
+        state: present
+
+    - name: Install GNS3 server
+      apt:
+        name: gns3-server
+        state: present
+        update_cache: yes
+
+    - name: Add ubuntu user to kvm/libvirt
+      user:
+        name: ubuntu
+        groups: kvm,libvirt
+        append: yes
+
+    - name: Enable and start GNS3 server
+      systemd:
+        name: gns3
+        enabled: yes
+        state: started
