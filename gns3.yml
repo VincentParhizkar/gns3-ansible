@@ -1,40 +1,52 @@
 ---
-- hosts: all
-  become: true
+- hosts: localhost
+  become: yes
   tasks:
 
-    - name: Ensure prerequisites are installed
+    - name: Install dependencies
       apt:
-        name: "{{ item }}"
+        name:
+          - python3-pip
+          - python3-venv
+          - libvirt-daemon-system
+          - libvirt-clients
+          - bridge-utils
+          - qemu-kvm
         state: present
         update_cache: yes
-      loop:
-        - python3
-        - python3-pip
-        - python3-venv
-        - git
-        - curl
 
-    - name: Ensure /opt/gns3 exists with correct permissions
-      file:
-        path: /opt/gns3
-        state: directory
-        owner: ubuntu
-        group: ubuntu
-        mode: '0755'
-
-    - name: Install GNS3 server via pip
+    - name: Install GNS3 via pip
       pip:
         name: gns3-server
-        state: latest
+        executable: pip3
 
-    - name: Create GNS3 config directory
+    - name: Locate gns3server binary
+      command: which gns3server
+      register: gns3server_path
+      changed_when: false
+
+    - name: Fail if gns3server is not installed
+      fail:
+        msg: "gns3server binary not found!"
+      when: gns3server_path.stdout == ""
+
+    - name: Ensure /etc/gns3 exists
       file:
         path: /etc/gns3
         state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
         mode: '0755'
 
-    - name: Deploy GNS3 server config
+    - name: Ensure /opt/gns3 exists
+      file:
+        path: /opt/gns3
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+
+    - name: Create GNS3 server config file
       copy:
         dest: /etc/gns3/gns3_server.conf
         content: |
@@ -43,9 +55,9 @@
           port = 3080
           images_path = /opt/gns3/images
           projects_path = /opt/gns3/projects
-          appliances_path = /opt/gns3/appliances
+        mode: '0644'
 
-    - name: Deploy systemd unit file for gns3
+    - name: Create systemd service for GNS3
       copy:
         dest: /etc/systemd/system/gns3.service
         content: |
@@ -54,18 +66,19 @@
           After=network.target
 
           [Service]
-          ExecStart=/usr/bin/python3 /usr/local/bin/gns3server --config /etc/gns3/gns3_server.conf
+          ExecStart={{ gns3server_path.stdout }} --config /etc/gns3/gns3_server.conf
           Restart=always
-          User=ubuntu
-          WorkingDirectory=/home/ubuntu
+          User={{ ansible_user }}
 
           [Install]
           WantedBy=multi-user.target
-      notify: Restart gns3
+        mode: '0644'
 
-  handlers:
-    - name: Restart gns3
+    - name: Reload systemd to pick up new unit
+      command: systemctl daemon-reload
+
+    - name: Enable and start GNS3 service
       systemd:
         name: gns3
-        state: restarted
         enabled: yes
+        state: started
