@@ -1,6 +1,9 @@
 ---
 - hosts: localhost
   become: yes
+  vars:
+    gns3_user: "{{ lookup('env', 'USER') }}"
+
   tasks:
 
     - name: Install dependencies
@@ -34,16 +37,16 @@
       file:
         path: /etc/gns3
         state: directory
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
+        owner: "{{ gns3_user }}"
+        group: "{{ gns3_user }}"
         mode: '0755'
 
     - name: Ensure /opt/gns3 exists
       file:
         path: /opt/gns3
         state: directory
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
+        owner: "{{ gns3_user }}"
+        group: "{{ gns3_user }}"
         mode: '0755'
 
     - name: Create GNS3 server config file
@@ -55,6 +58,8 @@
           port = 3080
           images_path = /opt/gns3/images
           projects_path = /opt/gns3/projects
+        owner: "{{ gns3_user }}"
+        group: "{{ gns3_user }}"
         mode: '0644'
 
     - name: Create systemd service for GNS3
@@ -68,7 +73,7 @@
           [Service]
           ExecStart={{ gns3server_path.stdout }} --config /etc/gns3/gns3_server.conf
           Restart=always
-          User={{ ansible_user }}
+          User={{ gns3_user }}
 
           [Install]
           WantedBy=multi-user.target
