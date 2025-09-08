@@ -1,27 +1,18 @@
 ---
-- hosts: all
+- hosts: localhost
   become: yes
   tasks:
-    - name: Update apt cache
+    - name: Ensure system is up to date
       apt:
         update_cache: yes
-
-    - name: Upgrade all packages
-      apt:
         upgrade: dist
-        force_apt_get: yes
+        cache_valid_time: 3600
 
-    - name: Install dependencies
+    - name: Install prerequisites
       apt:
         name:
           - software-properties-common
-          - qemu-kvm
-          - qemu-utils
-          - libvirt-daemon-system
-          - libvirt-clients
-          - bridge-utils
-          - dynamips
-          - vpcs
+          - python3-pip
         state: present
 
     - name: Add GNS3 PPA
@@ -29,19 +20,58 @@
         repo: ppa:gns3/ppa
         state: present
 
-    - name: Install GNS3 server
+    - name: Install GNS3 server and dependencies
       apt:
-        name: gns3-server
+        name:
+          - gns3-server
+          - dynamips
         state: present
         update_cache: yes
 
-    - name: Add ubuntu user to kvm/libvirt
-      user:
-        name: ubuntu
-        groups: kvm,libvirt
-        append: yes
+    - name: Fix Python dependencies for requests
+      pip:
+        name:
+          - "urllib3<2.0"
+          - "chardet<5.0"
+        extra_args: --break-system-packages
 
-    - name: Enable and start GNS3 server
+    - name: Ensure GNS3 config directory exists
+      file:
+        path: /etc/gns3
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Create GNS3 server config
+      copy:
+        dest: /etc/gns3/gns3_server.conf
+        content: |
+          [Server]
+          host = 0.0.0.0
+          port = 3080
+          local = true
+
+    - name: Create systemd service for GNS3
+      copy:
+        dest: /etc/systemd/system/gns3.service
+        content: |
+          [Unit]
+          Description=GNS3 server
+          After=network.target
+
+          [Service]
+          ExecStart=/usr/bin/gns3server --config /etc/gns3/gns3_server.conf
+          Restart=always
+          User=ubuntu
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd
+      command: systemctl daemon-reload
+
+    - name: Enable and start GNS3 service
       systemd:
         name: gns3
         enabled: yes
