@@ -2,7 +2,7 @@
 - hosts: localhost
   become: yes
   vars:
-    gns3_user: "{{ lookup('env', 'USER') }}"
+    gns3_user: "{{ ansible_env.SUDO_USER | default(ansible_env.USER, true) | default('root', true) }}"
 
   tasks:
 
@@ -41,13 +41,23 @@
         group: "{{ gns3_user }}"
         mode: '0755'
 
-    - name: Ensure /opt/gns3 exists
+    - name: Ensure /opt/gns3/images exists
       file:
-        path: /opt/gns3
+        path: /opt/gns3/images
         state: directory
         owner: "{{ gns3_user }}"
         group: "{{ gns3_user }}"
         mode: '0755'
+        recurse: yes
+
+    - name: Ensure /opt/gns3/projects exists
+      file:
+        path: /opt/gns3/projects
+        state: directory
+        owner: "{{ gns3_user }}"
+        group: "{{ gns3_user }}"
+        mode: '0755'
+        recurse: yes
 
     - name: Create GNS3 server config file
       copy:
