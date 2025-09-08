@@ -20,6 +20,16 @@
         name: gns3-server
         executable: pip3
 
+    - name: Locate gns3server binary
+      command: which gns3server
+      register: gns3server_path
+      changed_when: false
+
+    - name: Fail if gns3server is not installed
+      fail:
+        msg: "gns3server binary not found!"
+      when: gns3server_path.stdout == ""
+
     - name: Create GNS3 config directory
       file:
         path: /etc/gns3
@@ -40,6 +50,28 @@
         owner: ubuntu
         group: ubuntu
         mode: '0644'
+
+    - name: Create systemd service for GNS3
+      copy:
+        dest: /etc/systemd/system/gns3.service
+        content: |
+          [Unit]
+          Description=GNS3 server
+          After=network.target
+
+          [Service]
+          ExecStart={{ gns3server_path.stdout }} --config /etc/gns3/gns3_server.conf
+          Restart=always
+          User=ubuntu
+
+          [Install]
+          WantedBy=multi-user.target
+      owner: root
+      group: root
+      mode: '0644'
+
+    - name: Reload systemd to pick up new unit
+      command: systemctl daemon-reload
 
     - name: Enable and start GNS3 service
       systemd:
