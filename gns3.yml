@@ -67,12 +67,15 @@
 
           [Install]
           WantedBy=multi-user.target
+      become: yes
 
     - name: Reload systemd
       command: systemctl daemon-reload
+      become: yes
 
-    - name: Enable and start GNS3 service
+    - name: Enable and start GNS3 server
       systemd:
         name: gns3
         enabled: yes
         state: started
+      become: yes
